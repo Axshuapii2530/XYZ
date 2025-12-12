@@ -6,10 +6,10 @@ module.exports = {
   config: {
     name: "help",
     version: "2.0",
-    author: "Lord Denish (merged from NTKhang + BhandariMilan API)",
-    role: 0,
+    author: "Lord Denish (Modified by Axshu)",
+    role: 2,
     shortDescription: "Show bot commands",
-    longDescription: "Displays all commands with Pinterest image and uptime",
+    longDescription: "Displays all bot commands and uptime without image",
     category: "info",
     guide: "{p}help / {p}help cmdName"
   },
@@ -17,7 +17,6 @@ module.exports = {
   onStart: async function ({ api, event, args, role, threadsData }) {
     try {
       const { threadID } = event;
-      const threadData = await threadsData.get(threadID);
       const prefix = getPrefix(threadID);
 
       // Bot uptime
@@ -27,13 +26,7 @@ module.exports = {
       const seconds = Math.floor(uptime % 60);
       const uptimeStr = `${hours}h ${minutes}m ${seconds}s`;
 
-      // Random Pinterest keywords
-      const keywords = ["anime boy", "anime girl", "nature", "cyberpunk", "aesthetic", "wallpaper", "meme", "cool art"];
-      const randomKeyword = keywords[Math.floor(Math.random() * keywords.length)];
-      const pinRes = await axios.get(`https://www.bhandarimilan.info.np/api/pinterest?query=${encodeURIComponent(randomKeyword)}`);
-      const imageUrl = pinRes.data?.data?.[0] || null;
-
-      // Case 1: Show full help list
+      // Case 1: Show full help
       if (args.length === 0) {
         const categories = {};
         let msg = "";
@@ -60,47 +53,44 @@ module.exports = {
         });
 
         const totalCommands = commands.size;
-        msg += `\n\n📌 Total Commands: ${totalCommands}\n⏳ Uptime: ${uptimeStr}\n📸 Pinterest: ${randomKeyword}\n\n👉 Type ${prefix}help <cmdName> to view details.\n🐐 | Ryuk4zi`;
+        msg += `\n\n📌 Total Commands: ${totalCommands}\n⏳ Uptime: ${uptimeStr}\n\n👉 Type ${prefix}help <cmdName> to view details.\n🐐 | Ryuk4zi`;
 
-        if (!imageUrl) return api.sendMessage(msg, threadID, event.messageID);
+        return api.sendMessage(msg, threadID, event.messageID);
+      }
 
-        const imgRes = await axios.get(imageUrl, { responseType: "stream" });
-        return api.sendMessage({ body: msg, attachment: imgRes.data }, threadID, event.messageID);
+      // Case 2: Single command help
+      const commandName = args[0].toLowerCase();
+      const command = commands.get(commandName) || commands.get(aliases.get(commandName));
 
-      } else {
-        // Case 2: Show command details
-        const commandName = args[0].toLowerCase();
-        const command = commands.get(commandName) || commands.get(aliases.get(commandName));
+      if (!command) {
+        return api.sendMessage(`❌ Command "${commandName}" not found.`, threadID, event.messageID);
+      }
 
-        if (!command) {
-          return api.sendMessage(`❌ Command "${commandName}" not found.`, threadID, event.messageID);
-        }
+      const config = command.config;
+      const roleText = roleTextToString(config.role);
+      const longDescription = config.longDescription?.en || "No description";
+      const usage = (config.guide?.en || "")
+        .replace(/{p}/g, prefix)
+        .replace(/{n}/g, config.name);
 
-        const configCommand = command.config;
-        const roleText = roleTextToString(configCommand.role);
-        const author = configCommand.author || "Unknown";
-        const longDescription = configCommand.longDescription ? configCommand.longDescription.en || "No description" : "No description";
-        const guideBody = configCommand.guide?.en || "No guide available.";
-        const usage = guideBody.replace(/{p}/g, prefix).replace(/{n}/g, configCommand.name);
-
-        const response = `╭── NAME ────⭓
-│ ${configCommand.name}
+      const response = `╭── NAME ────⭓
+│ ${config.name}
 ├── INFO
 │ Description: ${longDescription}
-│ Aliases: ${configCommand.aliases ? configCommand.aliases.join(", ") : "None"}
-│ Version: ${configCommand.version || "1.0"}
+│ Aliases: ${config.aliases ? config.aliases.join(", ") : "None"}
+│ Version: ${config.version || "1.0"}
 │ Role: ${roleText}
-│ Cooldown: ${configCommand.countDown || 1}s
-│ Author: ${author}
+│ Cooldown: ${config.countDown || 1}s
+│ Author: ${config.author || "Unknown"}
 ├── Usage
 │ ${usage}
 ╰────────────`;
 
-        return api.sendMessage(response, threadID, event.messageID);
-      }
+      return api.sendMessage(response, threadID, event.messageID);
+
     } catch (err) {
       console.error(err);
-      return api.sendMessage("❌ | Failed to fetch help or image.", event.threadID, event.messageID);
+      return api.sendMessage("❌ | Failed to fetch help.", event.threadID, event.messageID);
     }
   }
 };
@@ -112,4 +102,4 @@ function roleTextToString(roleText) {
     case 2: return "2 (Bot admin)";
     default: return "Unknown role";
   }
-}
+              }
